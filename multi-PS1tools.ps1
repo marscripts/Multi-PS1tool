@@ -166,11 +166,13 @@ function AutomatedEmailReports {
 }
 
 function GitRepositoryManager {
-    Write-Host "Managing Git Repositories..." -ForegroundColor Yellow
-    $RepoPath = Read-Host "Enter the path to the repository"
-    cd $RepoPath
-    git pull
-    Write-Host "Repository updated successfully!" -ForegroundColor Green
+
+    Write-Host "Opening GitRepo 1 in a new tab..." -ForegroundColor Green
+        Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-File", ".\GitRepoManager.ps1"
+
+   
+
+  
 }
 
 function CustomModuleCreation {
