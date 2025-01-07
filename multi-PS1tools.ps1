@@ -8,20 +8,28 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 }
 
 function Show-Menu {
-    Write-Host "========== Multi-Tool Menu ==========" -ForegroundColor Cyan
-    Write-Host "1. File and Folder Management"
-    Write-Host "2. User Account Management (Active Directory)"
-    Write-Host "3. System Health Check"
-    Write-Host "4. Backup Automation"
-    Write-Host "5. Log File Analysis"
-    Write-Host "6. Scheduled Task Manager"
-    Write-Host "7. Service Monitor and Restart"
-    Write-Host "8. Inventory Script"
-    Write-Host "9. Azure Resource Automation"
-    Write-Host "10. Automated Email Reports"
-    Write-Host "11. Git Repository Manager"
-    Write-Host "12. Custom Module Creation"
-    Write-Host "0. Exit"
+    Clear-Host
+    Write-Host "===========================================" -ForegroundColor Cyan
+    Write-Host "             🌟 Multi-Tool Menu 🌟         " -ForegroundColor Yellow
+    Write-Host "===========================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "[1]  📁 File and Folder Management" -ForegroundColor Green
+    Write-Host "[2]  👤 User Account Management (Active Directory)" -ForegroundColor Green
+    Write-Host "[3]  🖥️  System Health Check" -ForegroundColor Green
+    Write-Host "[4]  💾 Backup Automation" -ForegroundColor Green
+    Write-Host "[5]  📜 Log File Analysis" -ForegroundColor Green
+    Write-Host "[6]  🕒 Scheduled Task Manager" -ForegroundColor Green
+    Write-Host "[7]  ⚙️ Service Monitor and Restart" -ForegroundColor Green
+    Write-Host "[8]  📝 Inventory Script" -ForegroundColor Green
+    Write-Host "[9]  ☁️ Azure Resource Automation" -ForegroundColor Green
+    Write-Host "[10] 📧 Automated Email Reports" -ForegroundColor Green
+    Write-Host "[11] 🔄 Git Repository Manager" -ForegroundColor Green
+    Write-Host "[12] 📦 Custom Module Creation" -ForegroundColor Green
+    Write-Host "[13] 🛠️ Install New Software" -ForegroundColor Green
+    Write-Host "[0]  ❌ Exit" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "===========================================" -ForegroundColor Cyan
+    Write-Host " Please enter your choice (0-13):" -ForegroundColor Yellow
 }
 
 function FileAndFolderManagement {
@@ -168,7 +176,7 @@ function AutomatedEmailReports {
 function GitRepositoryManager {
 
     Write-Host "Opening GitRepo 1 in a new tab..." -ForegroundColor Green
-        Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-File", ".\GitRepoManager.ps1"
+        Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-File", "C:\Users\sandboxmra\Desktop\GitRepoManager.ps1"
 
    
 
@@ -188,6 +196,101 @@ Export-ModuleMember -Function Test-Function
 "@ | Out-File -FilePath $FullPath
     Write-Host "Module created at $FullPath" -ForegroundColor Green
 }
+
+function InstallSoftware {
+  
+    Write-Host "===================================" -ForegroundColor Cyan
+    Write-Host "          Software Installer        " -ForegroundColor Cyan
+    Write-Host "===================================" -ForegroundColor Cyan
+    Write-Host "1. firefox"
+    Write-Host "2. pdfQear"
+    Write-Host "3. 7-Zip"
+    Write-Host "4. Install All"
+    Write-Host "0. Exit"
+    Write-Host "===================================" -ForegroundColor Cyan
+
+    $selection = Read-Host "Please select an option (1-5)"
+
+    # Define URLs for software downloads
+    $firefoxUrl = "https://download.mozilla.org/?product=firefox-stub&os=win64&lang=de"
+    $pdfGearUrl = "https://downloadfiles.pdfgear.com/releases/windows/pdfgear_setup_v2.1.11.exe"
+    $sevenZipUrl = "https://www.7-zip.org/a/7z2301-x64.exe"
+
+    # Define temporary file paths for downloads
+    $tempPath = "$env:Temp"
+    $firefoxPath = Join-Path -Path $tempPath -ChildPath "firefox Installer.exe"
+    $pdfGearPath = Join-Path -Path $tempPath -ChildPath "pdfgear_setup_v2.1.11.exe"
+    $sevenZipPath = Join-Path -Path $tempPath -ChildPath "7zip_installer.exe"
+
+     #---------------------------------------------------------------------------------------------------------------------------------
+
+    switch ($selection) {
+        "1" {
+                    Write-Host "Downloading and Installing firefox..." -ForegroundColor Green
+                    Invoke-WebRequest -Uri $firefoxUrl -OutFile $firefoxPath
+                    Start-Process -FilePath $firefoxPath -ArgumentList "/silent", "/install" -NoNewWindow -Wait
+                    Write-Host "Firefox installation completed!" -ForegroundColor Green
+               }
+
+   #---------------------------------------------------------------------------------------------------------------------------------
+         "2" {
+            Write-Host "Downloading and Installing PDFGear..." -ForegroundColor Green
+            Invoke-WebRequest -Uri $pdfGearUrl -OutFile $pdfGearPath
+            Start-Process -FilePath $pdfGearPath -ArgumentList "/S" -NoNewWindow -Wait
+            Write-Host "PDFGear installation completed!" -ForegroundColor Green
+        }
+
+ #---------------------------------------------------------------------------------------------------------------------------------
+
+        "3" {
+            Write-Host "Downloading and Installing 7-Zip..." -ForegroundColor Green
+            Invoke-WebRequest -Uri $sevenZipUrl -OutFile $sevenZipPath
+            Start-Process -FilePath $sevenZipPath -ArgumentList "/S" -NoNewWindow -Wait
+            Write-Host "7-Zip installation completed!" -ForegroundColor Green
+        }
+
+
+   #---------------------------------------------------------------------------------------------------------------------------------
+        "4" {
+            Write-Host "Downloading and Installing all software..." -ForegroundColor Green
+
+            # Install Google Chrome
+            Write-Host "Downloading and Installing Google Chrome..." -ForegroundColor Green
+            Invoke-WebRequest -Uri $firefoxUrl -OutFile $firefoxPath
+            Start-Process -FilePath $firefoxPath -ArgumentList "/silent", "/install" -NoNewWindow -Wait
+
+            # Install Adobe Reader
+            Write-Host "Downloading and Installing Adobe Reader..." -ForegroundColor Green
+            Invoke-WebRequest -Uri $pdfGearUrl -OutFile $pdfGearPath
+            Start-Process -FilePath $pdfGearPath -ArgumentList "/sAll", "/msi /quiet /norestart" -NoNewWindow -Wait
+
+            # Install 7-Zip
+            Write-Host "Downloading and Installing 7-Zip..." -ForegroundColor Green
+            Invoke-WebRequest -Uri $sevenZipUrl -OutFile $sevenZipPath
+            Start-Process -FilePath $sevenZipPath -ArgumentList "/S" -NoNewWindow -Wait
+
+            Write-Host "All software installed successfully!" -ForegroundColor Green
+        }
+
+
+         #---------------------------------------------------------------------------------------------------------------------------------
+        "0" {
+            Write-Host "Exiting the installer. Goodbye!" -ForegroundColor Yellow
+            return
+        }
+        default {
+            Write-Host "Invalid selection. Please try again." -ForegroundColor Red
+            Start-Sleep -Seconds 2
+            InstallSoftware # Restart the function for valid input
+        }
+
+    }
+    
+        # Run the function
+        InstallSoftware
+}
+
+
 
 function Exit-Script {
     Write-Host "Exiting... Goodbye!" -ForegroundColor Cyan
@@ -211,6 +314,7 @@ do {
         "10" { AutomatedEmailReports }
         "11" { GitRepositoryManager }
         "12" { CustomModuleCreation }
+        "13" {InstallSoftware}
         "0" { Exit-Script }
         default { Write-Host "Invalid selection, please try again." -ForegroundColor Red }
     }
