@@ -26,6 +26,7 @@ function Show-Menu {
     Write-Host "[11] 🔄 Git Repository Manager" -ForegroundColor Green
     Write-Host "[12] 📦 Custom Module Creation" -ForegroundColor Green
     Write-Host "[13] 🛠️ Install New Software" -ForegroundColor Green
+    Write-Host "[14] 🆑 make your taskbar"   -ForegroundColor Green
     Write-Host "[0]  ❌ Exit" -ForegroundColor Red
     Write-Host ""
     Write-Host "===========================================" -ForegroundColor Cyan
@@ -273,6 +274,7 @@ function InstallSoftware {
         }
 
 
+
          #---------------------------------------------------------------------------------------------------------------------------------
         "0" {
             Write-Host "Exiting the installer. Goodbye!" -ForegroundColor Yellow
@@ -289,6 +291,50 @@ function InstallSoftware {
         # Run the function
         InstallSoftware
 }
+
+
+# Funktion: taskbarCleaner
+function taskbarCleaner {
+    Write-Output "Starte Taskleisten-Aufräumprozess..."
+
+    # Widgets deaktivieren
+    Write-Output "Deaktiviere Widgets..."
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0
+
+    # Suchsymbol deaktivieren
+    Write-Output "Deaktiviere Suchsymbol..."
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Value 0
+
+    # Taskleistenausrichtung auf linksbündig setzen
+    Write-Output "Setze Taskleistenausrichtung auf linksbündig..."
+    $bytes = [byte[]](0x28,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00)
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3" -Name "Settings" -Value $bytes
+
+    # Alle Anwendungen von der Taskleiste entfernen (außer Explorer)
+    Write-Output "Entferne alle angehefteten Anwendungen von der Taskleiste außer Explorer..."
+    $taskbarPath = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
+    Remove-Item "$taskbarPath\*" -Force -ErrorAction SilentlyContinue
+
+    # Explorer wieder anheften
+    Write-Output "Explorer an Taskleiste anheften..."
+    $explorerPath = "C:\Windows\explorer.exe"
+    $shortcutPath = Join-Path -Path $taskbarPath -ChildPath "Explorer.lnk"
+    New-Object -ComObject WScript.Shell | ForEach-Object { $_.CreateShortcut($shortcutPath).TargetPath = $explorerPath; $_.Save() }
+
+    # Benachrichtigungen deaktivieren
+    Write-Output "Deaktiviere unnötige Benachrichtigungen..."
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\PushNotifications" -Name "ToastEnabled" -Value 0
+
+    # Explorer neu starten, um Änderungen anzuwenden
+    Write-Output "Explorer neu starten, um Änderungen anzuwenden..."
+    Stop-Process -Name explorer -Force
+    Start-Process explorer
+
+    Write-Output "Taskleisten-Aufräumprozess abgeschlossen!"
+}
+
+#
+
 
 
 
@@ -315,6 +361,7 @@ do {
         "11" { GitRepositoryManager }
         "12" { CustomModuleCreation }
         "13" {InstallSoftware}
+        "14" {taskbarCleaner}
         "0" { Exit-Script }
         default { Write-Host "Invalid selection, please try again." -ForegroundColor Red }
     }
