@@ -8,7 +8,7 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 }
 
 function Show-Menu {
-    Clear-Host
+
     Write-Host "===========================================" -ForegroundColor Cyan
     Write-Host "             🌟 Multi-Tool Menu 🌟         " -ForegroundColor Yellow
     Write-Host "===========================================" -ForegroundColor Cyan
@@ -77,6 +77,8 @@ function SystemHealthCheck {
     Write-Host "Memory Usage: $Memory%"
     Write-Host "Disk Usage:"
     $Disk | Format-Table -AutoSize
+
+   
 }
 
 function BackupAutomation {
@@ -147,15 +149,45 @@ function ServiceMonitorAndRestart {
     }
 }
 
+
 function InventoryScript {
-    Write-Host "Gathering System Information..." -ForegroundColor Yellow
-    $SystemInfo = Get-WmiObject -Class Win32_ComputerSystem
-    $OSInfo = Get-WmiObject -Class Win32_OperatingSystem
-    Write-Host "System Manufacturer: $($SystemInfo.Manufacturer)"
-    Write-Host "Model: $($SystemInfo.Model)"
-    Write-Host "OS: $($OSInfo.Caption)"
-    Write-Host "Architecture: $($OSInfo.OSArchitecture)"
+    Write-Output "`n=== Inventory Script ==="
+    
+    # Get Operating System details
+    Write-Output "`n=== Operating System Information ==="
+    $osInfo = Get-ComputerInfo | Select-Object -Property WindowsVersion, WindowsBuildLabEx, OsArchitecture, CsName, WindowsRegisteredOrganization, WindowsRegisteredOwner
+    $osInfo | Format-List
+
+    # Get Hardware Information
+    Write-Output "`n=== Hardware Information ==="
+    $computerSystem = Get-WmiObject -Class Win32_ComputerSystem
+    $processor = Get-WmiObject -Class Win32_Processor
+
+    Write-Output "Manufacturer: $($computerSystem.Manufacturer)"
+    Write-Output "Model: $($computerSystem.Model)"
+    Write-Output "Total Physical Memory (GB): $([Math]::Round($computerSystem.TotalPhysicalMemory / 1GB, 2))"
+    Write-Output "Processor: $($processor.Name)"
+    Write-Output "Processor Cores: $($processor.NumberOfCores)"
+    Write-Output "Processor Logical Processors: $($processor.NumberOfLogicalProcessors)"
+
+    # Get list of installed applications
+    Write-Output "`n=== Installed Applications ==="
+    $apps = Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" `
+        , "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" `
+        , "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" `
+        | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Sort-Object DisplayName
+
+    if ($apps) {
+        $apps | Where-Object { $_.DisplayName -ne $null } | Format-Table -AutoSize
+    } else {
+        Write-Output "No applications found."
+    }
+
+    Write-Output "`nReport Completed."
 }
+
+
+
 
 function AzureResourceAutomation {
     Write-Host "Managing Azure Resources..." -ForegroundColor Yellow
@@ -178,10 +210,7 @@ function GitRepositoryManager {
 
     Write-Host "Opening GitRepo 1 in a new tab..." -ForegroundColor Green
         Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-File", "C:\Users\sandboxmra\Desktop\GitRepoManager.ps1"
-
-   
-
-  
+         
 }
 
 function CustomModuleCreation {
@@ -199,83 +228,58 @@ Export-ModuleMember -Function Test-Function
 }
 
 function InstallSoftware {
-  
     Write-Host "===================================" -ForegroundColor Cyan
     Write-Host "          Software Installer        " -ForegroundColor Cyan
     Write-Host "===================================" -ForegroundColor Cyan
-    Write-Host "1. firefox"
-    Write-Host "2. pdfQear"
+    Write-Host "1. Firefox"
+    Write-Host "2. PDFGear"
     Write-Host "3. 7-Zip"
     Write-Host "4. Install All"
     Write-Host "0. Exit"
     Write-Host "===================================" -ForegroundColor Cyan
 
-    $selection = Read-Host "Please select an option (1-5)"
+    $selection = Read-Host "Please select an option (1-4)"
 
-    # Define URLs for software downloads
-    $firefoxUrl = "https://download.mozilla.org/?product=firefox-stub&os=win64&lang=de"
-    $pdfGearUrl = "https://downloadfiles.pdfgear.com/releases/windows/pdfgear_setup_v2.1.11.exe"
-    $sevenZipUrl = "https://www.7-zip.org/a/7z2301-x64.exe"
+    # Check if Chocolatey is installed
+    if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
+        Write-Host "Chocolatey is not installed. Installing Chocolatey..." -ForegroundColor Yellow
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        Write-Host "Chocolatey installation completed!" -ForegroundColor Green
+    }
 
-    # Define temporary file paths for downloads
-    $tempPath = "$env:Temp"
-    $firefoxPath = Join-Path -Path $tempPath -ChildPath "firefox Installer.exe"
-    $pdfGearPath = Join-Path -Path $tempPath -ChildPath "pdfgear_setup_v2.1.11.exe"
-    $sevenZipPath = Join-Path -Path $tempPath -ChildPath "7zip_installer.exe"
-
-     #---------------------------------------------------------------------------------------------------------------------------------
+    # Function to install a package via Chocolatey
+    function Install-ChocoPackage {
+        param (
+            [string]$PackageName
+        )
+        Write-Host "Installing $PackageName..." -ForegroundColor Green
+        choco install $PackageName -y
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "$PackageName installation completed successfully!" -ForegroundColor Green
+        } else {
+            Write-Host "Failed to install $PackageName. Check for errors." -ForegroundColor Red
+        }
+    }
 
     switch ($selection) {
         "1" {
-                    Write-Host "Downloading and Installing firefox..." -ForegroundColor Green
-                    Invoke-WebRequest -Uri $firefoxUrl -OutFile $firefoxPath
-                    Start-Process -FilePath $firefoxPath -ArgumentList "/silent", "/install" -NoNewWindow -Wait
-                    Write-Host "Firefox installation completed!" -ForegroundColor Green
-               }
-
-   #---------------------------------------------------------------------------------------------------------------------------------
-         "2" {
-            Write-Host "Downloading and Installing PDFGear..." -ForegroundColor Green
-            Invoke-WebRequest -Uri $pdfGearUrl -OutFile $pdfGearPath
-            Start-Process -FilePath $pdfGearPath -ArgumentList "/S" -NoNewWindow -Wait
-            Write-Host "PDFGear installation completed!" -ForegroundColor Green
+            Install-ChocoPackage -PackageName "firefox"
         }
-
- #---------------------------------------------------------------------------------------------------------------------------------
-
+        "2" {
+            Install-ChocoPackage -PackageName "pdfgear"
+        }
         "3" {
-            Write-Host "Downloading and Installing 7-Zip..." -ForegroundColor Green
-            Invoke-WebRequest -Uri $sevenZipUrl -OutFile $sevenZipPath
-            Start-Process -FilePath $sevenZipPath -ArgumentList "/S" -NoNewWindow -Wait
-            Write-Host "7-Zip installation completed!" -ForegroundColor Green
+            Install-ChocoPackage -PackageName "7zip"
         }
-
-
-   #---------------------------------------------------------------------------------------------------------------------------------
         "4" {
-            Write-Host "Downloading and Installing all software..." -ForegroundColor Green
-
-            # Install Google Chrome
-            Write-Host "Downloading and Installing Google Chrome..." -ForegroundColor Green
-            Invoke-WebRequest -Uri $firefoxUrl -OutFile $firefoxPath
-            Start-Process -FilePath $firefoxPath -ArgumentList "/silent", "/install" -NoNewWindow -Wait
-
-            # Install Adobe Reader
-            Write-Host "Downloading and Installing Adobe Reader..." -ForegroundColor Green
-            Invoke-WebRequest -Uri $pdfGearUrl -OutFile $pdfGearPath
-            Start-Process -FilePath $pdfGearPath -ArgumentList "/sAll", "/msi /quiet /norestart" -NoNewWindow -Wait
-
-            # Install 7-Zip
-            Write-Host "Downloading and Installing 7-Zip..." -ForegroundColor Green
-            Invoke-WebRequest -Uri $sevenZipUrl -OutFile $sevenZipPath
-            Start-Process -FilePath $sevenZipPath -ArgumentList "/S" -NoNewWindow -Wait
-
+            Write-Host "Installing all software..." -ForegroundColor Green
+            Install-ChocoPackage -PackageName "firefox"
+            Install-ChocoPackage -PackageName "pdfgear"
+            Install-ChocoPackage -PackageName "7zip"
             Write-Host "All software installed successfully!" -ForegroundColor Green
         }
-
-
-
-         #---------------------------------------------------------------------------------------------------------------------------------
         "0" {
             Write-Host "Exiting the installer. Goodbye!" -ForegroundColor Yellow
             return
@@ -285,12 +289,13 @@ function InstallSoftware {
             Start-Sleep -Seconds 2
             InstallSoftware # Restart the function for valid input
         }
-
     }
-    
-        # Run the function
-        InstallSoftware
+    # Run the function
+InstallSoftware
 }
+
+
+
 
 
 # Funktion: taskbarCleaner
@@ -333,7 +338,7 @@ function taskbarCleaner {
     Write-Output "Taskleisten-Aufräumprozess abgeschlossen!"
 }
 
-#
+
 
 
 
@@ -345,6 +350,7 @@ function Exit-Script {
 
 # Main Menu Loop
 do {
+
     Show-Menu
     $Selection = Read-Host "Enter your choice"
     switch ($Selection) {
@@ -365,4 +371,4 @@ do {
         "0" { Exit-Script }
         default { Write-Host "Invalid selection, please try again." -ForegroundColor Red }
     }
-} while ($true)
+}while ($true)
