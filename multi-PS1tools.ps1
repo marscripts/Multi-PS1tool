@@ -111,27 +111,86 @@ function LogFileAnalysis {
 }
 
 function ScheduledTaskManager {
-    Write-Host "Managing Scheduled Tasks..." -ForegroundColor Yellow
-    Write-Host "1. Create Task"
-    Write-Host "2. List Tasks"
-    Write-Host "3. Remove Task"
-    $Choice = Read-Host "Select an option"
+    Write-Host "Scheduled Task Manager" -ForegroundColor Yellow
+    Write-Host "1. Create a Task"
+    Write-Host "2. List All Tasks"
+    Write-Host "3. View Task Details"
+    Write-Host "4. Remove a Task"
+    Write-Host "5. Exit"
+    
+    $Choice = Read-Host "Select an option (1-5)"
+    
     switch ($Choice) {
         "1" {
-            $TaskName = Read-Host "Enter the task name"
-            $Action = New-ScheduledTaskAction -Execute "notepad.exe"
-            $Trigger = New-ScheduledTaskTrigger -AtStartup
-            Register-ScheduledTask -Action $Action -Trigger $Trigger -TaskName $TaskName
-            Write-Host "Task created successfully!" -ForegroundColor Green
+            try {
+                $TaskName = Read-Host "Enter the task name"
+                $ProgramPath = Read-Host "Enter the full path of the program to execute (e.g., C:\Windows\System32\notepad.exe)"
+                $TriggerType = Read-Host "Enter the trigger type (Startup, Daily, or OneTime)"
+                $Action = New-ScheduledTaskAction -Execute $ProgramPath
+                
+                # Configure the trigger based on user input
+                switch ($TriggerType.ToLower()) {
+                    "startup" { $Trigger = New-ScheduledTaskTrigger -AtStartup }
+                    "daily" {
+                        $StartTime = Read-Host "Enter the start time (HH:mm)"
+                        $Trigger = New-ScheduledTaskTrigger -Daily -At $StartTime
+                    }
+                    "onetime" {
+                        $StartTime = Read-Host "Enter the start time (yyyy-MM-ddTHH:mm)"
+                        $Trigger = New-ScheduledTaskTrigger -Once -At $StartTime
+                    }
+                    default {
+                        Write-Host "Invalid trigger type. Task creation aborted." -ForegroundColor Red
+                        return
+                    }
+                }
+                
+                Register-ScheduledTask -Action $Action -Trigger $Trigger -TaskName $TaskName
+                Write-Host "Task '$TaskName' created successfully!" -ForegroundColor Green
+            } catch {
+                Write-Error "Error creating the task: $_"
+            }
         }
-        "2" { Get-ScheduledTask | Format-Table }
+        "2" {
+            try {
+                Get-ScheduledTask | Format-Table TaskName, State, Description -AutoSize
+            } catch {
+                Write-Error "Error listing tasks: $_"
+            }
+        }
         "3" {
-            $TaskName = Read-Host "Enter the task name"
-            Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-            Write-Host "Task removed successfully!" -ForegroundColor Green
+            try {
+                $TaskName = Read-Host "Enter the name of the task to view details"
+                $Task = Get-ScheduledTask -TaskName $TaskName
+                $Task | Format-List
+            } catch {
+                Write-Error "Error retrieving task details: $_"
+            }
+        }
+        "4" {
+            try {
+                $TaskName = Read-Host "Enter the name of the task to remove"
+                if ([string]::IsNullOrWhiteSpace($TaskName)) {
+                    Write-Host "Task name cannot be empty. Operation aborted." -ForegroundColor Red
+                    return
+                }
+                Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+                Write-Host "Task '$TaskName' removed successfully!" -ForegroundColor Green
+            } catch {
+                Write-Error "Error removing the task: $_"
+            }
+        }
+        "5" {
+            Write-Host "Exiting Scheduled Task Manager." -ForegroundColor Yellow
+            return
+        }
+        default {
+            Write-Host "Invalid option. Please select a valid option (1-5)." -ForegroundColor Red
+            ScheduledTaskManager
         }
     }
 }
+
 
 function ServiceMonitorAndRestart {
     Write-Host "Monitoring Services..." -ForegroundColor Yellow
@@ -298,44 +357,101 @@ InstallSoftware
 
 
 
-# Funktion: taskbarCleaner
 function taskbarCleaner {
     Write-Output "Starte Taskleisten-Aufräumprozess..."
 
     # Widgets deaktivieren
     Write-Output "Deaktiviere Widgets..."
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0
+    try {
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarDa" -Value 0
+        Write-Output "Widgets erfolgreich deaktiviert."
+    } catch {
+        Write-Error "Fehler beim Deaktivieren der Widgets: $_"
+    }
 
     # Suchsymbol deaktivieren
     Write-Output "Deaktiviere Suchsymbol..."
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Value 0
+    try {
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Search" -Name "SearchboxTaskbarMode" -Value 3
+        Write-Output "Suchsymbol erfolgreich deaktiviert."
+    } catch {
+        Write-Error "Fehler beim Deaktivieren des Suchsymbols: $_"
+    }
 
     # Taskleistenausrichtung auf linksbündig setzen
     Write-Output "Setze Taskleistenausrichtung auf linksbündig..."
-    $bytes = [byte[]](0x28,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00)
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3" -Name "Settings" -Value $bytes
+    $alignmentBytes = [byte[]](
+        0x28, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00
+    )
+    try {
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3" -Name "Settings" -Value $alignmentBytes
+        Write-Output "Taskleistenausrichtung erfolgreich geändert."
+    } catch {
+        Write-Error "Fehler beim Setzen der Taskleistenausrichtung: $_"
+    }
 
-    # Alle Anwendungen von der Taskleiste entfernen (außer Explorer)
+    # Entferne alle angehefteten Anwendungen von der Taskleiste außer Explorer
     Write-Output "Entferne alle angehefteten Anwendungen von der Taskleiste außer Explorer..."
-    $taskbarPath = "$env:APPDATA\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
-    Remove-Item "$taskbarPath\*" -Force -ErrorAction SilentlyContinue
+    $taskbarPath = Join-Path $env:APPDATA "Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
+    if (Test-Path $taskbarPath) {
+        try {
+            Get-ChildItem -Path $taskbarPath -Force | ForEach-Object {
+                if ($_.Name -notlike "*explorer*.lnk") {
+                    Remove-Item -Path $_.FullName -Force -ErrorAction Stop
+                    Write-Output "Entfernt: $($_.Name)"
+                } else {
+                    Write-Output "Beibehalten: $($_.Name) (Explorer)"
+                }
+            }
+        } catch {
+            Write-Error "Fehler beim Entfernen angehefteter Anwendungen: $_"
+        }
+    } else {
+        Write-Warning "Taskleisten-Verknüpfungen-Ordner nicht gefunden: $taskbarPath"
+    }
 
-    # Explorer wieder anheften
+    # Explorer an Taskleiste anheften
     Write-Output "Explorer an Taskleiste anheften..."
-    $explorerPath = "C:\Windows\explorer.exe"
-    $shortcutPath = Join-Path -Path $taskbarPath -ChildPath "Explorer.lnk"
-    New-Object -ComObject WScript.Shell | ForEach-Object { $_.CreateShortcut($shortcutPath).TargetPath = $explorerPath; $_.Save() }
+    try {
+        $explorerPath = "C:\Windows\explorer.exe"
+        $pinnedPath = Join-Path $env:APPDATA "Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
+        if (!(Test-Path $pinnedPath)) {
+            New-Item -Path $pinnedPath -ItemType Directory -Force | Out-Null
+        }
+        $shortcutPath = Join-Path $pinnedPath "Explorer.lnk"
+        $shell = New-Object -ComObject WScript.Shell
+        $shortcut = $shell.CreateShortcut($shortcutPath)
+        $shortcut.TargetPath = $explorerPath
+        $shortcut.Save()
+        Write-Output "Explorer erfolgreich angeheftet."
+    } catch {
+        Write-Error "Fehler beim Anheften des Explorers: $_"
+    }
 
-    # Benachrichtigungen deaktivieren
+    # Deaktiviere unnötige Benachrichtigungen
     Write-Output "Deaktiviere unnötige Benachrichtigungen..."
-    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\PushNotifications" -Name "ToastEnabled" -Value 0
+    try {
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\PushNotifications" -Name "ToastEnabled" -Value 0
+        Write-Output "Benachrichtigungen erfolgreich deaktiviert."
+    } catch {
+        Write-Error "Fehler beim Deaktivieren der Benachrichtigungen: $_"
+    }
 
-    # Explorer neu starten, um Änderungen anzuwenden
-    Write-Output "Explorer neu starten, um Änderungen anzuwenden..."
-    Stop-Process -Name explorer -Force
-    Start-Process explorer
-
-    Write-Output "Taskleisten-Aufräumprozess abgeschlossen!"
+    # Explorer neu starten, um alle Änderungen anzuwenden
+    Write-Output "Starte Explorer neu, um Änderungen anzuwenden..."
+    try {
+        Stop-Process -Name explorer -Force
+        Start-Process explorer
+        Write-Output "Taskleisten-Aufräumprozess abgeschlossen!"
+    } catch {
+        Write-Error "Fehler beim Neustarten des Explorers: $_"
+    }
 }
 
 
