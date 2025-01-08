@@ -208,6 +208,8 @@ function SystemHealthCheck {
     Write-Host "Disk Usage:"
     $Disk | Format-Table -AutoSize
 
+    
+
    
 }
 
@@ -642,10 +644,127 @@ function AutomatedEmailReports {
 #---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 function GitRepositoryManager {
+    Write-Host "===================================" -ForegroundColor Cyan
+    Write-Host "         Git Repository Manager     " -ForegroundColor Cyan
+    Write-Host "===================================" -ForegroundColor Cyan
 
-    Write-Host "Opening GitRepo 1 in a new tab..." -ForegroundColor Green
-        Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-File", "C:\Users\sandboxmra\Desktop\GitRepoManager.ps1"
-         
+    # Check if Git is installed
+    if (!(Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Host "Git is not installed on this system." -ForegroundColor Yellow
+        $InstallGit = Read-Host "Do you want to install Git? (Yes/No)"
+        if ($InstallGit -eq "Yes") {
+            if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
+                Write-Host "Chocolatey is not installed. Installing Chocolatey..." -ForegroundColor Yellow
+                Set-ExecutionPolicy Bypass -Scope Process -Force
+                [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+                Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "Chocolatey installation completed successfully!" -ForegroundColor Green
+                } else {
+                    Write-Host "Failed to install Chocolatey. Exiting." -ForegroundColor Red
+                    return
+                }
+            }
+
+            Write-Host "Installing Git via Chocolatey..." -ForegroundColor Cyan
+            choco install git -y
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Git installed successfully!" -ForegroundColor Green
+                $env:PATH += ";C:\Program Files\Git\bin"
+            } else {
+                Write-Host "Failed to install Git. Exiting." -ForegroundColor Red
+                return
+            }
+        } else {
+            Write-Host "Git is required for this tool to work. Exiting." -ForegroundColor Red
+            return
+        }
+    }
+
+    # Verify Git availability
+    if (!(Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Host "Git is still not recognized. Ensure it is added to PATH and try again." -ForegroundColor Red
+        return
+    }
+
+    # Main menu
+    while ($true) {
+        Write-Host "`nSelect an option:" -ForegroundColor Yellow
+        Write-Host "1. Clone a repository"
+        Write-Host "2. Pull changes from a repository"
+        Write-Host "3. Push updates to a repository"
+        Write-Host "0. Exit"
+        Write-Host "===================================" -ForegroundColor Cyan
+
+        $Choice = Read-Host "Enter your choice (1-4)"
+
+        switch ($Choice) {
+            "1" {
+                # Clone a repository
+                $RepoURL = Read-Host "Enter the repository URL to clone"
+                $Destination = Read-Host "Enter the destination directory (leave blank for current directory)"
+                if ([string]::IsNullOrWhiteSpace($Destination)) {
+                    $Destination = "."
+                }
+
+                Write-Host "Cloning repository from '$RepoURL' to '$Destination'..." -ForegroundColor Cyan
+                git clone $RepoURL $Destination
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "Repository cloned successfully!" -ForegroundColor Green
+                } else {
+                    Write-Host "Failed to clone repository. Check the URL and try again." -ForegroundColor Red
+                }
+            }
+            "2" {
+                # Pull changes
+                $RepoPath = Read-Host "Enter the path to the local repository"
+                if (-not (Test-Path $RepoPath)) {
+                    Write-Host "Invalid path! Please enter a valid repository path." -ForegroundColor Red
+                } else {
+                    Set-Location -Path $RepoPath
+                    Write-Host "Pulling changes from the remote repository..." -ForegroundColor Cyan
+                    git pull
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host "Changes pulled successfully!" -ForegroundColor Green
+                    } else {
+                        Write-Host "Failed to pull changes. Check the repository status." -ForegroundColor Red
+                    }
+                    Set-Location -Path (Get-Location).Path
+                }
+            }
+            "3" {
+                # Push updates
+                $RepoPath = Read-Host "Enter the path to the local repository"
+                if (-not (Test-Path $RepoPath)) {
+                    Write-Host "Invalid path! Please enter a valid repository path." -ForegroundColor Red
+                } else {
+                    Set-Location -Path $RepoPath
+                    $CommitMessage = Read-Host "Enter a commit message for your changes"
+                    Write-Host "Staging changes..." -ForegroundColor Cyan
+                    git add .
+                    Write-Host "Committing changes with message: '$CommitMessage'..." -ForegroundColor Cyan
+                    git commit -m $CommitMessage
+                    Write-Host "Pushing updates to the remote repository..." -ForegroundColor Cyan
+                    git push
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host "Updates pushed successfully!" -ForegroundColor Green
+                    } else {
+                        Write-Host "Failed to push updates. Check the repository status." -ForegroundColor Red
+                    }
+                    Set-Location -Path (Get-Location).Path
+                }
+            }
+            "0" {
+                # Exit
+                Write-Host "Exiting Git Repository Manager. Goodbye!" -ForegroundColor Yellow
+                return 
+            }
+            default {
+                Write-Host "Invalid choice. Please enter a valid option." -ForegroundColor Red
+            }
+        }
+    }
+    GitRepositoryManager
 }
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------------
