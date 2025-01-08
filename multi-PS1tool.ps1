@@ -30,7 +30,7 @@ function Show-Menu {
     Write-Host "[0]  ❌ Exit" -ForegroundColor Red
     Write-Host ""
     Write-Host "===========================================" -ForegroundColor Cyan
-    Write-Host " Please enter your choice (0-13):" -ForegroundColor Yellow
+    Write-Host " Please enter your choice (0-14):" -ForegroundColor Yellow
 }
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------------
