@@ -668,17 +668,23 @@ Export-ModuleMember -Function Test-Function
 #---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 function InstallSoftware {
+    # Function Header
     Write-Host "===================================" -ForegroundColor Cyan
     Write-Host "          Software Installer        " -ForegroundColor Cyan
     Write-Host "===================================" -ForegroundColor Cyan
     Write-Host "1. Firefox"
     Write-Host "2. PDFGear"
     Write-Host "3. 7-Zip"
-    Write-Host "4. Install All"
+    Write-Host "4. GitHub Desktop"
+    Write-Host "5. Visual Studio Code"
+    Write-Host "6. VMware Workstation"
+    Write-Host "7. VirtualBox"
+    Write-Host "00. Install All"
     Write-Host "0. Exit"
     Write-Host "===================================" -ForegroundColor Cyan
 
-    $selection = Read-Host "Please select an option (1-4)"
+    # Get user selection
+    $selection = Read-Host "Please select an option (1-7, 00, 0)"
 
     # Check if Chocolatey is installed
     if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
@@ -686,10 +692,15 @@ function InstallSoftware {
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
         Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-        Write-Host "Chocolatey installation completed!" -ForegroundColor Green
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Chocolatey installation completed successfully!" -ForegroundColor Green
+        } else {
+            Write-Host "Failed to install Chocolatey. Exiting the installer." -ForegroundColor Red
+            return
+        }
     }
 
-    # Function to install a package via Chocolatey
+    # Define a function to install a package via Chocolatey
     function Install-ChocoPackage {
         param (
             [string]$PackageName
@@ -703,22 +714,31 @@ function InstallSoftware {
         }
     }
 
+    # Map package names to options for extensibility
+    $softwarePackages = @{
+        "1"  = "firefox"
+        "2"  = "pdfgear"
+        "3"  = "7zip"
+        "4"  = "github-desktop"
+        "5"  = "vscode"
+        "6"  = "vmwareworkstation"
+        "7"  = "virtualbox"
+        "00" = @("firefox", "pdfgear", "7zip", "github-desktop", "vscode", "vmwareworkstation", "virtualbox")
+    }
+
+    # Process the selection
     switch ($selection) {
-        "1" {
-            Install-ChocoPackage -PackageName "firefox"
-        }
-        "2" {
-            Install-ChocoPackage -PackageName "pdfgear"
-        }
-        "3" {
-            Install-ChocoPackage -PackageName "7zip"
-        }
-        "4" {
-            Write-Host "Installing all software..." -ForegroundColor Green
-            Install-ChocoPackage -PackageName "firefox"
-            Install-ChocoPackage -PackageName "pdfgear"
-            Install-ChocoPackage -PackageName "7zip"
-            Write-Host "All software installed successfully!" -ForegroundColor Green
+        { $_ -in $softwarePackages.Keys } {
+            # Install one or multiple packages
+            $packages = $softwarePackages[$_]
+            if ($packages -is [string]) {
+                Install-ChocoPackage -PackageName $packages
+            } elseif ($packages -is [array]) {
+                foreach ($pkg in $packages) {
+                    Install-ChocoPackage -PackageName $pkg
+                }
+                Write-Host "All selected software installed successfully!" -ForegroundColor Green
+            }
         }
         "0" {
             Write-Host "Exiting the installer. Goodbye!" -ForegroundColor Yellow
@@ -730,6 +750,7 @@ function InstallSoftware {
             InstallSoftware # Restart the function for valid input
         }
     }
+
     # Run the function
 InstallSoftware
 }
