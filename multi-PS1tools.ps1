@@ -33,38 +33,168 @@ function Show-Menu {
     Write-Host " Please enter your choice (0-13):" -ForegroundColor Yellow
 }
 
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
+
 function FileAndFolderManagement {
-    Write-Host "Organizing files and folders..." -ForegroundColor Yellow
+    Write-Host "File and Folder Management Tool" -ForegroundColor Yellow
+
+    # Prompt for the directory to organize
     $Directory = Read-Host "Enter the directory to organize"
     if (-not (Test-Path $Directory)) {
-        Write-Host "Invalid directory path!" -ForegroundColor Red
+        Write-Host "Error: Invalid directory path!" -ForegroundColor Red
         return
     }
-    Get-ChildItem -Path $Directory -File | ForEach-Object {
-        $Extension = $_.Extension.TrimStart(".")
-        $TargetFolder = Join-Path $Directory $Extension
-        if (-not (Test-Path $TargetFolder)) { New-Item -ItemType Directory -Path $TargetFolder }
-        Move-Item -Path $_.FullName -Destination $TargetFolder -Force
-    }
-    Write-Host "Files organized by type!" -ForegroundColor Green
-}
 
-function UserAccountManagement {
-    Write-Host "Managing User Accounts..." -ForegroundColor Yellow
-    $CsvFile = Read-Host "Enter the path to the CSV file"
-    if (-not (Test-Path $CsvFile)) {
-        Write-Host "Invalid file path!" -ForegroundColor Red
-        return
+    # Ask if the user wants a dry run
+    $DryRun = Read-Host "Do you want a dry-run first? (Yes/No)"
+    $IsDryRun = $DryRun -eq "Yes"
+
+    if ($IsDryRun) {
+        Write-Host "Performing a dry-run. No changes will be made." -ForegroundColor Cyan
+    } else {
+        Write-Host "Organizing files and folders..." -ForegroundColor Yellow
     }
-    Import-Csv -Path $CsvFile | ForEach-Object {
-        if (-not (Get-ADUser -Filter {SamAccountName -eq $_.SamAccountName})) {
-            New-ADUser -Name $_.Name -SamAccountName $_.SamAccountName -UserPrincipalName $_.UPN -Path $_.OU -Enabled $true
-            Write-Host "Created user: $($_.Name)" -ForegroundColor Green
-        } else {
-            Write-Host "User already exists: $($_.SamAccountName)" -ForegroundColor Yellow
+
+    # Process files in the directory
+    try {
+        $Files = Get-ChildItem -Path $Directory -File
+        if ($Files.Count -eq 0) {
+            Write-Host "No files found in the directory." -ForegroundColor Yellow
+            return
+        }
+
+        $Files | ForEach-Object {
+            $Extension = $_.Extension.TrimStart(".")
+            if ([string]::IsNullOrWhiteSpace($Extension)) {
+                $Extension = "NoExtension"
+            }
+            $TargetFolder = Join-Path $Directory $Extension
+
+            # Dry-run mode: Display actions without performing them
+            if ($IsDryRun) {
+                Write-Host "Would move file '$($_.Name)' to folder '$TargetFolder'" -ForegroundColor Gray
+            } else {
+                # Create the target folder if it doesn't exist
+                if (-not (Test-Path $TargetFolder)) {
+                    New-Item -ItemType Directory -Path $TargetFolder | Out-Null
+                    Write-Host "Created folder: $TargetFolder" -ForegroundColor Green
+                }
+                # Move the file to the target folder
+                Move-Item -Path $_.FullName -Destination $TargetFolder -Force
+                Write-Host "Moved file '$($_.Name)' to folder '$TargetFolder'" -ForegroundColor Cyan
+            }
+        }
+
+        Write-Host "Files organized by type!" -ForegroundColor Green
+
+    } catch {
+        Write-Error "An error occurred while organizing files: $_"
+    }
+
+    # Process folders (Optional: Organize by folder name if needed)
+    $OrganizeFolders = Read-Host "Do you want to organize folders too? (Yes/No)"
+    if ($OrganizeFolders -eq "Yes") {
+        try {
+            $Folders = Get-ChildItem -Path $Directory -Directory
+            if ($Folders.Count -eq 0) {
+                Write-Host "No subfolders found to organize." -ForegroundColor Yellow
+            } else {
+                $Folders | ForEach-Object {
+                    # Example: Move folders with specific logic if needed
+                    $FirstLetter = $_.Name.Substring(0, 1).ToUpper()
+                    $TargetFolder = Join-Path $Directory $FirstLetter
+
+                    if ($IsDryRun) {
+                        Write-Host "Would move folder '$($_.Name)' to '$TargetFolder'" -ForegroundColor Gray
+                    } else {
+                        # Create target folder if it doesn't exist
+                        if (-not (Test-Path $TargetFolder)) {
+                            New-Item -ItemType Directory -Path $TargetFolder | Out-Null
+                            Write-Host "Created folder: $TargetFolder" -ForegroundColor Green
+                        }
+                        # Move the folder
+                        Move-Item -Path $_.FullName -Destination $TargetFolder -Force
+                        Write-Host "Moved folder '$($_.Name)' to '$TargetFolder'" -ForegroundColor Cyan
+                    }
+                }
+                Write-Host "Folders organized by first letter!" -ForegroundColor Green
+            }
+        } catch {
+            Write-Error "An error occurred while organizing folders: $_"
         }
     }
+
+    Write-Host "File and folder management completed!" -ForegroundColor Yellow
 }
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+function UserAccountManagement {
+    Write-Host "User Account Management Tool" -ForegroundColor Yellow
+
+    # Prüfen, ob das Active Directory-Modul geladen ist
+    if (-not (Get-Module -Name ActiveDirectory -ErrorAction SilentlyContinue)) {
+        try {
+            Import-Module ActiveDirectory -ErrorAction Stop
+            Write-Host "Active Directory-Modul erfolgreich geladen." -ForegroundColor Green
+        } catch {
+            Write-Error "Das Active Directory-Modul ist nicht verfügbar. Stellen Sie sicher, dass es installiert ist."
+            return
+        }
+    }
+
+    # Prompt for the CSV file path
+    $CsvFile = Read-Host "Enter the path to the CSV file"
+    if (-not (Test-Path $CsvFile)) {
+        Write-Host "Error: Invalid file path!" -ForegroundColor Red
+        return
+    }
+
+    # Import and process the CSV file
+    try {
+        $Users = Import-Csv -Path $CsvFile
+        Write-Host "Processing $($Users.Count) user(s) from the CSV file..." -ForegroundColor Cyan
+    } catch {
+        Write-Error "Failed to import the CSV file: $_"
+        return
+    }
+
+    # Loop through each user in the CSV
+    $Users | ForEach-Object {
+        try {
+            $SamAccountName = $_.SamAccountName
+            $Name = $_.Name
+            $UPN = $_.UPN
+            $OU = $_.OU
+
+            # Validate required fields
+            if ([string]::IsNullOrWhiteSpace($SamAccountName) -or [string]::IsNullOrWhiteSpace($Name) -or [string]::IsNullOrWhiteSpace($UPN) -or [string]::IsNullOrWhiteSpace($OU)) {
+                Write-Host "Skipping invalid entry. Missing required fields for: $Name ($SamAccountName)" -ForegroundColor Red
+                return
+            }
+
+            # Check if the user already exists
+            $ExistingUser = Get-ADUser -Filter {SamAccountName -eq $SamAccountName} -ErrorAction SilentlyContinue
+            if ($ExistingUser) {
+                Write-Host "User already exists: $SamAccountName" -ForegroundColor Yellow
+            } else {
+                # Create a new user
+                New-ADUser -Name $Name `
+                           -SamAccountName $SamAccountName `
+                           -UserPrincipalName $UPN `
+                           -Path $OU `
+                           -Enabled $true `
+                           -AccountPassword (ConvertTo-SecureString "P@ssw0rd!" -AsPlainText -Force)
+                Write-Host "Created user: $Name ($SamAccountName)" -ForegroundColor Green
+            }
+        } catch {
+            Write-Error "Error processing user $SamAccountName $_"
+        }
+    }
+
+    Write-Host "User account management process completed!" -ForegroundColor Yellow
+}
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 function SystemHealthCheck {
     Write-Host "Performing System Health Check..." -ForegroundColor Yellow
@@ -81,34 +211,167 @@ function SystemHealthCheck {
    
 }
 
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
+
 function BackupAutomation {
     Write-Host "Automating Backups..." -ForegroundColor Yellow
+
+    # Prompt for source and destination directories
     $Source = Read-Host "Enter the source directory"
     $Destination = Read-Host "Enter the backup directory"
-    if (-not (Test-Path $Source) -or -not (Test-Path $Destination)) {
-        Write-Host "Invalid paths!" -ForegroundColor Red
+
+    # Validate paths
+    if (-not (Test-Path $Source)) {
+        Write-Host "Error: Invalid source directory!" -ForegroundColor Red
         return
     }
+    if (-not (Test-Path $Destination)) {
+        try {
+            Write-Host "Destination directory does not exist. Creating it..." -ForegroundColor Yellow
+            New-Item -ItemType Directory -Path $Destination | Out-Null
+        } catch {
+            Write-Error "Failed to create destination directory: $_"
+            return
+        }
+    }
+
+    # Create a log file in the destination directory
     $LogFile = Join-Path $Destination "BackupLog.txt"
-    Start-Transcript -Path $LogFile -Append
-    Copy-Item -Path $Source\* -Destination $Destination -Recurse
-    Write-Host "Backup completed!" -ForegroundColor Green
-    Stop-Transcript
+    try {
+        Start-Transcript -Path $LogFile -Append
+    } catch {
+        Write-Error "Failed to start transcript: $_"
+        return
+    }
+
+    # Exclude certain files or folders (optional)
+    $ExcludePatterns = @(".tmp", ".bak", "Thumbs.db")  # Add more patterns if needed
+    $ExcludedItems = @()
+
+    # Perform the backup with progress tracking
+    Write-Host "Starting backup process..." -ForegroundColor Cyan
+    try {
+        Get-ChildItem -Path $Source -Recurse | ForEach-Object {
+            $RelativePath = $_.FullName.Substring($Source.Length).TrimStart("\")
+            $TargetPath = Join-Path $Destination $RelativePath
+
+            # Check if the item matches any exclude pattern
+            if ($ExcludePatterns -contains $_.Extension) {
+                Write-Host "Excluding: $($_.FullName)" -ForegroundColor Yellow
+                $ExcludedItems += $_.FullName
+                return
+            }
+
+            if ($_.PSIsContainer) {
+                # Create directory if it doesn't exist
+                if (-not (Test-Path $TargetPath)) {
+                    New-Item -ItemType Directory -Path $TargetPath | Out-Null
+                    Write-Host "Created directory: $TargetPath" -ForegroundColor Green
+                }
+            } else {
+                # Copy file
+                Copy-Item -Path $_.FullName -Destination $TargetPath -Force
+                Write-Host "Copied: $($_.FullName) -> $TargetPath" -ForegroundColor Cyan
+            }
+        }
+        Write-Host "Backup completed successfully!" -ForegroundColor Green
+    } catch {
+        Write-Error "An error occurred during the backup process: $_"
+    } finally {
+        Stop-Transcript
+    }
+
+    # Log excluded items
+    if ($ExcludedItems.Count -gt 0) {
+        Write-Host "Excluded items:" -ForegroundColor Yellow
+        $ExcludedItems | ForEach-Object { Write-Host $_ -ForegroundColor Gray }
+    }
 }
 
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
+
 function LogFileAnalysis {
-    Write-Host "Analyzing Log Files..." -ForegroundColor Yellow
+    Write-Host "Log File Analysis Tool" -ForegroundColor Yellow
+
+    # Get log file path
     $LogFile = Read-Host "Enter the path to the log file"
-    $Keyword = Read-Host "Enter the keyword to search for"
     if (-not (Test-Path $LogFile)) {
-        Write-Host "Invalid log file path!" -ForegroundColor Red
+        Write-Host "Error: Invalid log file path!" -ForegroundColor Red
         return
     }
-    $Results = Select-String -Path $LogFile -Pattern $Keyword
-    $Results | ForEach-Object {
-        Write-Host $_.Line -ForegroundColor Green
+
+    # Get keyword to search for
+    $Keyword = Read-Host "Enter the keyword to search for"
+    if ([string]::IsNullOrWhiteSpace($Keyword)) {
+        Write-Host "Error: Keyword cannot be empty!" -ForegroundColor Red
+        return
+    }
+
+    Write-Host "Searching for keyword '$Keyword' in file '$LogFile'..." -ForegroundColor Cyan
+
+    # Perform search
+    try {
+        $Results = Select-String -Path $LogFile -Pattern $Keyword
+        if ($Results) {
+            # Display results
+            Write-Host "Found $($Results.Count) matching lines:" -ForegroundColor Green
+            $Results | ForEach-Object {
+                Write-Host "Line $($_.LineNumber): $($_.Line)" -ForegroundColor Yellow
+            }
+
+            # Additional options for results
+            Write-Host "What would you like to do with the results?" -ForegroundColor Cyan
+            Write-Host "1. Export to file"
+            Write-Host "2. View full lines with context"
+            Write-Host "3. Exit"
+            $Choice = Read-Host "Select an option (1-3)"
+
+            switch ($Choice) {
+                "1" {
+                    $ExportPath = Read-Host "Enter the export file path"
+                    try {
+                        $Results | Out-File -FilePath $ExportPath
+                        Write-Host "Results exported to $ExportPath" -ForegroundColor Green
+                    } catch {
+                        Write-Error "Error exporting results: $_"
+                    }
+                }
+                "2" {
+                    $ContextLines = Read-Host "Enter the number of context lines to include (default: 2)"
+                    if (-not [int]::TryParse($ContextLines, [ref]$null)) {
+                        $ContextLines = 2
+                    }
+                    $ContextResults = Select-String -Path $LogFile -Pattern $Keyword -Context $ContextLines
+                    Write-Host "Displaying results with context:" -ForegroundColor Yellow
+                    $ContextResults | ForEach-Object {
+                        Write-Host "Match found on line $($_.LineNumber): $($_.Line.Trim())" -ForegroundColor Cyan
+                        if ($_.Context.PreContext) {
+                            Write-Host "Pre-Context:" -ForegroundColor Gray
+                            $_.Context.PreContext | ForEach-Object { Write-Host "  $_" }
+                        }
+                        if ($_.Context.PostContext) {
+                            Write-Host "Post-Context:" -ForegroundColor Gray
+                            $_.Context.PostContext | ForEach-Object { Write-Host "  $_" }
+                        }
+                        Write-Host "----"
+                    }
+                }
+                "3" {
+                    Write-Host "Exiting the tool." -ForegroundColor Yellow
+                }
+                default {
+                    Write-Host "Invalid option. Exiting." -ForegroundColor Red
+                }
+            }
+        } else {
+            Write-Host "No matches found for '$Keyword' in '$LogFile'." -ForegroundColor Red
+        }
+    } catch {
+        Write-Error "Error analyzing log file: $_"
     }
 }
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 function ScheduledTaskManager {
     Write-Host "Scheduled Task Manager" -ForegroundColor Yellow
@@ -191,22 +454,59 @@ function ScheduledTaskManager {
     }
 }
 
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
+
 
 function ServiceMonitorAndRestart {
-    Write-Host "Monitoring Services..." -ForegroundColor Yellow
+    Write-Host "Service Monitoring and Restart Tool" -ForegroundColor Yellow
+
+    # Prompt for the service name
     $ServiceName = Read-Host "Enter the name of the service to monitor"
+
+    # Check if the service exists
     $Service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
     if (-not $Service) {
-        Write-Host "Service not found!" -ForegroundColor Red
+        Write-Host "Error: Service not found!" -ForegroundColor Red
         return
     }
-    if ($Service.Status -ne "Running") {
-        Start-Service -Name $ServiceName
-        Write-Host "Service restarted: $ServiceName" -ForegroundColor Green
-    } else {
-        Write-Host "Service is already running: $ServiceName" -ForegroundColor Green
+
+    # Prompt for monitoring interval
+    $Interval = Read-Host "Enter the monitoring interval in seconds (default: 30)"
+    if (-not [int]::TryParse($Interval, [ref]$null)) {
+        $Interval = 30
+    }
+
+    # Continuous monitoring loop
+    Write-Host "Monitoring service '$ServiceName' every $Interval seconds. Press Ctrl+C to stop." -ForegroundColor Cyan
+    try {
+        while ($true) {
+            $Service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+            if (-not $Service) {
+                Write-Host "Service '$ServiceName' no longer exists!" -ForegroundColor Red
+                break
+            }
+
+            if ($Service.Status -ne "Running") {
+                Write-Host "Service '$ServiceName' is not running. Attempting to restart..." -ForegroundColor Yellow
+                try {
+                    Start-Service -Name $ServiceName
+                    Write-Host "Service restarted successfully: $ServiceName" -ForegroundColor Green
+                } catch {
+                    Write-Error "Failed to restart service '$ServiceName': $_"
+                }
+            } else {
+                Write-Host "Service is running: $ServiceName" -ForegroundColor Green
+            }
+
+            # Wait for the specified interval
+            Start-Sleep -Seconds $Interval
+        }
+    } catch {
+        Write-Error "An error occurred during service monitoring: $_"
     }
 }
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 function InventoryScript {
@@ -246,13 +546,87 @@ function InventoryScript {
 }
 
 
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
 
 
 function AzureResourceAutomation {
-    Write-Host "Managing Azure Resources..." -ForegroundColor Yellow
-    Connect-AzAccount
-    Write-Host "Connected to Azure. Please manage resources using Azure commands."
+    Write-Host "Azure Resource Automation Tool" -ForegroundColor Yellow
+
+    # Try connecting to Azure
+    try {
+        Write-Host "Connecting to Azure..." -ForegroundColor Cyan
+        Connect-AzAccount -ErrorAction Stop
+        Write-Host "Successfully connected to Azure!" -ForegroundColor Green
+    } catch {
+        Write-Error "Failed to connect to Azure. Please check your credentials and network connection."
+        return
+    }
+
+    # Display menu for resource management
+    while ($true) {
+        Write-Host "`nSelect an option:" -ForegroundColor Yellow
+        Write-Host "1. List Resources"
+        Write-Host "2. Create a Resource Group"
+        Write-Host "3. Delete a Resource Group"
+        Write-Host "4. Exit"
+
+        $Choice = Read-Host "Enter your choice (1-4)"
+
+        switch ($Choice) {
+            "1" {
+                try {
+                    Write-Host "Fetching resources..." -ForegroundColor Cyan
+                    $Resources = Get-AzResource
+                    if ($Resources.Count -eq 0) {
+                        Write-Host "No resources found in the current subscription." -ForegroundColor Yellow
+                    } else {
+                        $Resources | Format-Table Name, ResourceType, ResourceGroup, Location -AutoSize
+                    }
+                } catch {
+                    Write-Error "Failed to retrieve resources. Ensure you have access to a subscription."
+                }
+            }
+            "2" {
+                try {
+                    $ResourceGroupName = Read-Host "Enter the name of the new resource group"
+                    $Location = Read-Host "Enter the location (e.g., eastus, westus)"
+                    Write-Host "Creating resource group '$ResourceGroupName' in location '$Location'..." -ForegroundColor Cyan
+                    New-AzResourceGroup -Name $ResourceGroupName -Location $Location -ErrorAction Stop
+                    Write-Host "Resource group '$ResourceGroupName' created successfully!" -ForegroundColor Green
+                } catch {
+                    Write-Error "Failed to create the resource group. Ensure the location is valid."
+                }
+            }
+            "3" {
+                try {
+                    $ResourceGroupName = Read-Host "Enter the name of the resource group to delete"
+                    $Confirm = Read-Host "Are you sure you want to delete resource group '$ResourceGroupName'? This action cannot be undone! (Yes/No)"
+                    if ($Confirm -eq "Yes") {
+                        Write-Host "Deleting resource group '$ResourceGroupName'..." -ForegroundColor Cyan
+                        Remove-AzResourceGroup -Name $ResourceGroupName -Force -ErrorAction Stop
+                        Write-Host "Resource group '$ResourceGroupName' deleted successfully!" -ForegroundColor Green
+                    } else {
+                        Write-Host "Deletion cancelled." -ForegroundColor Yellow
+                    }
+                } catch {
+                    Write-Error "Failed to delete the resource group. Ensure the name is correct and you have permissions."
+                }
+            }
+            "4" {
+                Write-Host "Exiting Azure Resource Automation Tool. Goodbye!" -ForegroundColor Yellow
+                break
+            }
+            default {
+                Write-Host "Invalid choice. Please enter a number between 1 and 4." -ForegroundColor Red
+            }
+        }
+    }
 }
+
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 function AutomatedEmailReports {
     Write-Host "Sending Email Reports..." -ForegroundColor Yellow
@@ -265,12 +639,16 @@ function AutomatedEmailReports {
     Write-Host "Email sent successfully!" -ForegroundColor Green
 }
 
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
+
 function GitRepositoryManager {
 
     Write-Host "Opening GitRepo 1 in a new tab..." -ForegroundColor Green
         Start-Process -FilePath "powershell.exe" -ArgumentList "-NoExit", "-File", "C:\Users\sandboxmra\Desktop\GitRepoManager.ps1"
          
 }
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 function CustomModuleCreation {
     Write-Host "Creating Custom Module..." -ForegroundColor Yellow
@@ -285,6 +663,9 @@ Export-ModuleMember -Function Test-Function
 "@ | Out-File -FilePath $FullPath
     Write-Host "Module created at $FullPath" -ForegroundColor Green
 }
+
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 function InstallSoftware {
     Write-Host "===================================" -ForegroundColor Cyan
@@ -354,7 +735,7 @@ InstallSoftware
 }
 
 
-
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 function taskbarCleaner {
@@ -455,8 +836,7 @@ function taskbarCleaner {
 }
 
 
-
-
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 function Exit-Script {
