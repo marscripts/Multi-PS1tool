@@ -39,7 +39,11 @@ The **Multi-Tool PowerShell Script** is a versatile, menu-driven utility designe
 ---
 
 ## How to Start
-1. clone repo or download the zipfile [Zip](https://github.com/marscripts/Multi-PS1tool/archive/refs/heads/main.zip) && [Clone Repo](https://github.com/marscripts/Multi-PS1tool.git)
+1. clone repo or download the zipfile [Zip](https://github.com/marscripts/Multi-PS1tool/archive/refs/heads/main.zip) or
+2. Clone repo:
+ ````
+https://github.com/marscripts/Multi-PS1tool.git
+````
 3. Run the script:
    ```powershell
    ScriptRunnerAdm.bat
