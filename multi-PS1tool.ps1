@@ -25,7 +25,7 @@ function Show-Menu {
     Write-Host "[10] 📧 Automated Email Reports" -ForegroundColor Green
     Write-Host "[11] 🔄 Git Repository Manager" -ForegroundColor Green
     Write-Host "[12] 📦 Custom Module Creation" -ForegroundColor Green
-    Write-Host "[13] 🛠️ Install New Software" -ForegroundColor Green
+    Write-Host "[13] 🛠️ Manage Software" -ForegroundColor Green
     Write-Host "[14] 🆑 make your taskbar"   -ForegroundColor Green
     Write-Host "[0]  ❌ Exit" -ForegroundColor Red
     Write-Host ""
@@ -786,10 +786,10 @@ Export-ModuleMember -Function Test-Function
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------------
 
-function InstallSoftware {
+function ManageSoftware {
     # Function Header
     Write-Host "===================================" -ForegroundColor Cyan
-    Write-Host "          Software Installer        " -ForegroundColor Cyan
+    Write-Host "       Software Manager Tool       " -ForegroundColor Cyan
     Write-Host "===================================" -ForegroundColor Cyan
     Write-Host "1. Firefox"
     Write-Host "2. PDFGear"
@@ -798,12 +798,27 @@ function InstallSoftware {
     Write-Host "5. Visual Studio Code"
     Write-Host "6. VMware Workstation"
     Write-Host "7. VirtualBox"
-    Write-Host "00. Install All"
+    Write-Host "M. Enter a manual package name"
+    Write-Host "00. Manage All"
     Write-Host "0. Exit"
     Write-Host "===================================" -ForegroundColor Cyan
 
+    # Ask user for action: Install or Uninstall
+    Write-Host "Options:"
+    Write-Host "I - Install"
+    Write-Host "U - Uninstall"
+    $action = Read-Host "Would you like to (I)nstall or (U)ninstall software? Enter 'I' or 'U'"
+
+    # Validate action input
+    if ($action -notmatch "^[IiUu]$") {
+        Write-Host "Invalid action. Please enter 'I' for Install or 'U' for Uninstall." -ForegroundColor Red
+        return
+    }
+
+    $action = $action.ToUpper() # Standardize input
+
     # Get user selection
-    $selection = Read-Host "Please select an option (1-7, 00, 0)"
+    $selection = Read-Host "Please select an option (1-7, M, 00, 0)"
 
     # Check if Chocolatey is installed
     if (!(Get-Command choco -ErrorAction SilentlyContinue)) {
@@ -814,64 +829,100 @@ function InstallSoftware {
         if ($LASTEXITCODE -eq 0) {
             Write-Host "Chocolatey installation completed successfully!" -ForegroundColor Green
         } else {
-            Write-Host "Failed to install Chocolatey. Exiting the installer." -ForegroundColor Red
+            Write-Host "Failed to install Chocolatey. Exiting the manager." -ForegroundColor Red
             return
         }
     }
 
-    # Define a function to install a package via Chocolatey
-    function Install-ChocoPackage {
+    # Define a function to manage a package via Chocolatey
+    function Manage-ChocoPackage {
         param (
-            [string]$PackageName
+            [string]$PackageName,
+            [string]$Action
         )
-        Write-Host "Installing $PackageName..." -ForegroundColor Green
-        choco install $PackageName -y
+
+        if (-not $PackageName) {
+            Write-Host "Error: Package name is required. Please select a valid option or enter a manual package name." -ForegroundColor Red
+            return
+        }
+
+        if ($Action -eq "I") {
+            Write-Host "Installing $PackageName..." -ForegroundColor Green
+            choco install $PackageName -y
+            $operation = "installation"
+        } elseif ($Action -eq "U") {
+            Write-Host "Uninstalling $PackageName..." -ForegroundColor Green
+            choco uninstall $PackageName -y
+            $operation = "uninstallation"
+        }
+
+        # Check result
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "$PackageName installation completed successfully!" -ForegroundColor Green
+            Write-Host "$PackageName $operation completed successfully!" -ForegroundColor Green
         } else {
-            Write-Host "Failed to install $PackageName. Check for errors." -ForegroundColor Red
+            Write-Host "Failed to $operation $PackageName. Check for errors." -ForegroundColor Red
         }
     }
 
     # Map package names to options for extensibility
-    $softwarePackages = @{
-        "1"  = "firefox"
-        "2"  = "pdfgear"
-        "3"  = "7zip"
-        "4"  = "github-desktop"
-        "5"  = "vscode"
-        "6"  = "vmwareworkstation"
-        "7"  = "virtualbox"
-        "00" = @("firefox", "pdfgear", "7zip", "github-desktop", "vscode", "vmwareworkstation", "virtualbox")
-    }
+    $softwarePackages = @(
+        @{ Key = "1"; Name = "firefox" },
+        @{ Key = "2"; Name = "pdfgear" },
+        @{ Key = "3"; Name = "7zip" },
+        @{ Key = "4"; Name = "github-desktop" },
+        @{ Key = "5"; Name = "vscode" },
+        @{ Key = "6"; Name = "vmwareworkstation" },
+        @{ Key = "7"; Name = "virtualbox" }
+    )
 
-    # Process the selection
     switch ($selection) {
-        { $_ -in $softwarePackages.Keys } {
-            # Install one or multiple packages
-            $packages = $softwarePackages[$_]
-            if ($packages -is [string]) {
-                Install-ChocoPackage -PackageName $packages
-            } elseif ($packages -is [array]) {
-                foreach ($pkg in $packages) {
-                    Install-ChocoPackage -PackageName $pkg
+        { $softwarePackages.Key -contains $_ } {
+            # Manage one software
+            $package = $softwarePackages | Where-Object { $_.Key -eq $selection }
+            if ($package) {
+                Manage-ChocoPackage -PackageName $package.Name -Action $action
+            } else {
+                Write-Host "Error: Invalid selection. Please select a valid software option." -ForegroundColor Red
+            }
+        }
+                    "M" {
+                # Manual package entry
+                if ($action -eq "I") {
+                    $manualPackage = Read-Host "Enter the name of the package to install"
+                } else {
+                    $manualPackage = Read-Host "Enter the name of the package to uninstall"
                 }
+
+                if ($manualPackage) {
+                    Manage-ChocoPackage -PackageName $manualPackage -Action $action
+                } else {
+                    Write-Host "No package name entered. Please try again." -ForegroundColor Red
+                }
+            }
+
+        "00" {
+            # Manage all software
+            foreach ($pkg in $softwarePackages) {
+                Manage-ChocoPackage -PackageName $pkg.Name -Action $action
+            }
+            if ($action -eq "I") {
                 Write-Host "All selected software installed successfully!" -ForegroundColor Green
+            } else {
+                Write-Host "All selected software uninstalled successfully!" -ForegroundColor Green
             }
         }
         "0" {
-            Write-Host "Exiting the installer. Goodbye!" -ForegroundColor Yellow
+            Write-Host "Exiting the manager. Goodbye!" -ForegroundColor Yellow
             return
         }
         default {
             Write-Host "Invalid selection. Please try again." -ForegroundColor Red
             Start-Sleep -Seconds 2
-            InstallSoftware # Restart the function for valid input
+            ManageSoftware # Restart the function for valid input
         }
     }
-
     # Run the function
-InstallSoftware
+ManageSoftware
 }
 
 
@@ -1002,7 +1053,7 @@ do {
         "10" { AutomatedEmailReports }
         "11" { GitRepositoryManager }
         "12" { CustomModuleCreation }
-        "13" {InstallSoftware}
+        "13" {ManageSoftware}
         "14" {taskbarCleaner}
         "0" { Exit-Script }
         default { Write-Host "Invalid selection, please try again." -ForegroundColor Red }
