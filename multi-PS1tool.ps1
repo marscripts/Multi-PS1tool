@@ -27,6 +27,7 @@ function Show-Menu {
     Write-Host "[12] 📦 Custom Module Creation" -ForegroundColor Green
     Write-Host "[13] 🛠️ Manage Software" -ForegroundColor Green
     Write-Host "[14] 🆑 make your taskbar"   -ForegroundColor Green
+    Write-Host "[15] 🖼️ Set your Pinter up"  -ForegroundColor Green
     Write-Host "[0]  ❌ Exit" -ForegroundColor Red
     Write-Host ""
     Write-Host "===========================================" -ForegroundColor Cyan
@@ -1026,6 +1027,152 @@ function taskbarCleaner {
     }
 }
 
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
+<#
+.SYNOPSIS
+    Flexible Automated Printer Setup Script for Customer Support.
+
+.DESCRIPTION
+    - Combines dynamic discovery, manual input, and configuration file support in a single function.
+    - Includes robust error handling, logging, and interactive prompts.
+
+.PARAMETER EnableLogging
+    Enables logging of setup activities.
+
+.EXAMPLE
+    .\PrinterSetup.ps1
+#>
+
+function printerSetup {
+    param (
+        [switch]$EnableLogging,
+        [switch]$AllowManualInput
+    )
+
+    # Initialize Variables
+    $PrinterList = @()
+    $logFile = if ($EnableLogging) {
+        "$env:USERPROFILE\PrinterSetupLog_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+    }
+
+    if ($EnableLogging) {
+        Write-Host "Logging enabled. Log file: $logFile" -ForegroundColor Green
+        Add-Content -Path $logFile -Value "Printer Setup Log - $(Get-Date)`n"
+    }
+
+    # Dynamic Printer Discovery
+    Write-Host "Scanning for printers on the network..." -ForegroundColor Cyan
+    $DiscoveredPrinters = Get-Printer | Select-Object Name, PortName
+
+    if ($DiscoveredPrinters.Count -gt 0) {
+        $PrinterList += $DiscoveredPrinters | ForEach-Object {
+            @{
+                Name = $_.Name
+                Address = $_.PortName
+            }
+        }
+        Write-Host "Discovered printers added to the list." -ForegroundColor Green
+    } else {
+        Write-Host "No printers discovered on this network." -ForegroundColor Yellow
+    }
+
+    # Optionally Load Printers from a Configuration File
+    if (-not $PrinterList.Count -and $AllowManualInput) {
+        $configPath = Read-Host "Enter the path to a printer configuration file (or leave blank to skip)"
+        if ($configPath -and (Test-Path $configPath)) {
+            $PrinterList = Get-Content $configPath | ConvertFrom-Json
+            Write-Host "Printers loaded from configuration file." -ForegroundColor Green
+        } else {
+            Write-Host "No valid configuration file provided. Proceeding with manual input." -ForegroundColor Yellow
+        }
+    }
+
+    # Add Printers Manually if No Options Exist
+    if ($PrinterList.Count -eq 0 -and $AllowManualInput) {
+        Write-Host "No printers discovered or pre-configured. You can add printers manually." -ForegroundColor Cyan
+    }
+
+    function Show-PrinterMenu {
+        param ([array]$PrinterList)
+        Write-Host "`nAvailable Printers:" -ForegroundColor Cyan
+        for ($i = 0; $i -lt $PrinterList.Count; $i++) {
+            Write-Host "$($i + 1). $($PrinterList[$i].Name) ($($PrinterList[$i].Address))"
+        }
+        Write-Host "$($PrinterList.Count + 1). Enter a custom printer"
+        Write-Host "$($PrinterList.Count + 2). Exit"
+
+        $selection = Read-Host "Enter the number of the printer to set up, or choose an option above"
+        if ($selection -match '^\d+$' -and $selection -le $PrinterList.Count) {
+            return $PrinterList[$selection - 1]
+        } elseif ($selection -eq "$($PrinterList.Count + 1)") {
+            $customPrinterName = Read-Host "Enter the printer name"
+            $customPrinterAddress = Read-Host "Enter the printer IP or hostname"
+            return @{ Name = $customPrinterName; Address = $customPrinterAddress }
+        } elseif ($selection -eq "$($PrinterList.Count + 2)") {
+            Write-Host "Exiting printer setup..." -ForegroundColor Yellow
+            return $null
+        } else {
+            Write-Host "Invalid selection. Please try again." -ForegroundColor Red
+            return Show-PrinterMenu -PrinterList $PrinterList
+        }
+    }
+
+    # Interactive Printer Setup
+    do {
+        $selectedPrinter = Show-PrinterMenu -PrinterList $PrinterList
+
+        if ($selectedPrinter) {
+            $printerName = $selectedPrinter.Name
+            $printerAddress = $selectedPrinter.Address
+
+            Write-Host "Adding printer: $printerName at $printerAddress..." -ForegroundColor Cyan
+            Try {
+                Add-PrinterPort -Name $printerAddress -PrinterHostAddress $printerAddress -ErrorAction Stop
+                Add-Printer -Name $printerName -PortName $printerAddress -DriverName "Microsoft Enhanced Point and Print Compatibility Driver" -ErrorAction Stop
+                Write-Host "Successfully added printer: $printerName." -ForegroundColor Green
+                if ($EnableLogging) {
+                    Add-Content -Path $logFile -Value "Successfully added printer: $printerName ($printerAddress)."
+                }
+            } Catch {
+                Write-Host "Failed to add printer: $printerName. Error: $_" -ForegroundColor Red
+                if ($EnableLogging) {
+                    Add-Content -Path $logFile -Value "Failed to add printer: $printerName ($printerAddress). Error: $_"
+                }
+            }
+
+            # Prompt to Set Default Printer
+            $setDefault = Read-Host "Do you want to set $printerName as the default printer? (Yes/No)"
+            if ($setDefault -match "^(Yes|Y)$") {
+                Try {
+                    Set-DefaultPrinter -Name $printerName
+                    Write-Host "$printerName is now the default printer." -ForegroundColor Green
+                    if ($EnableLogging) {
+                        Add-Content -Path $logFile -Value "Default printer set to: $printerName."
+                    }
+                } Catch {
+                    Write-Host "Failed to set default printer: $printerName. Error: $_" -ForegroundColor Red
+                    if ($EnableLogging) {
+                        Add-Content -Path $logFile -Value "Failed to set default printer: $printerName. Error: $_"
+                    }
+                }
+            }
+        }
+    } while ($selectedPrinter)
+
+    # Show Configured Printers
+    Write-Host "`nConfigured Printers:" -ForegroundColor Blue
+    $configuredPrinters = Get-Printer | Select-Object Name, PrinterStatus
+    $configuredPrinters | Format-Table -AutoSize
+
+    if ($EnableLogging) {
+        Add-Content -Path $logFile -Value "Configured printers:`n$($configuredPrinters | Out-String)"
+    }
+
+    Write-Host "Printer setup completed!" -ForegroundColor Green
+    # Run the script
+
+}
+
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1055,6 +1202,7 @@ do {
         "12" { CustomModuleCreation }
         "13" {ManageSoftware}
         "14" {taskbarCleaner}
+        "15" {printerSetup}
         "0" { Exit-Script }
         default { Write-Host "Invalid selection, please try again." -ForegroundColor Red }
     }
