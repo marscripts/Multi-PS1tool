@@ -1206,4 +1206,7 @@ do {
         "0" { Exit-Script }
         default { Write-Host "Invalid selection, please try again." -ForegroundColor Red }
     }
+
+     Read-Host "`nDrücke [Enter], um fortzufahren..."
+    Clear-Host
 }while ($true)
