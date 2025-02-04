@@ -20,7 +20,8 @@ The Multi-Tool PowerShell Script is a powerful and user-friendly utility crafted
 - **Custom Module Creation**: Generate custom PowerShell modules.
 - **Install New Software**: Install popular software using Chocolatey.
 - **Taskbar Cleaner**: Optimize your Windows taskbar for efficiency.
-- **PrinterSetup**: Set your Printer easly up. 
+- **PrinterSetup**: Set your Printer easly up.
+- ** Manage systems Languages: add, rmove, list and set default language just by entering some number.
 
 ---
 
