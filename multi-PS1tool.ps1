@@ -28,10 +28,11 @@ function Show-Menu {
     Write-Host "[13] 🛠️ Manage Software" -ForegroundColor Green
     Write-Host "[14] 🆑 make your taskbar"   -ForegroundColor Green
     Write-Host "[15] 🖼️ Set your Pinter up"  -ForegroundColor Green
+    Write-host "[16] 🎲 Manage your system Language" -ForegroundColor Green
     Write-Host "[0]  ❌ Exit" -ForegroundColor Red
     Write-Host ""
     Write-Host "===========================================" -ForegroundColor Cyan
-    Write-Host " Please enter your choice (0-14):" -ForegroundColor Yellow
+    Write-Host " Please enter your choice (1-16 or 0):" -ForegroundColor Yellow
 }
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -382,9 +383,9 @@ function ScheduledTaskManager {
     Write-Host "2. List All Tasks"
     Write-Host "3. View Task Details"
     Write-Host "4. Remove a Task"
-    Write-Host "5. Exit"
+    Write-Host "0. Exit"
     
-    $Choice = Read-Host "Select an option (1-5)"
+    $Choice = Read-Host "Select an option (1-4 or 0)"
     
     switch ($Choice) {
         "1" {
@@ -446,15 +447,16 @@ function ScheduledTaskManager {
                 Write-Error "Error removing the task: $_"
             }
         }
-        "5" {
+        "0" {
             Write-Host "Exiting Scheduled Task Manager." -ForegroundColor Yellow
             return
         }
         default {
             Write-Host "Invalid option. Please select a valid option (1-5)." -ForegroundColor Red
-            ScheduledTaskManager
+            
         }
     }
+    ScheduledTaskManager
 }
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -573,9 +575,9 @@ function AzureResourceAutomation {
         Write-Host "1. List Resources"
         Write-Host "2. Create a Resource Group"
         Write-Host "3. Delete a Resource Group"
-        Write-Host "4. Exit"
+        Write-Host "0. Exit"
 
-        $Choice = Read-Host "Enter your choice (1-4)"
+        $Choice = Read-Host "Enter your choice (1-3 or 0)"
 
         switch ($Choice) {
             "1" {
@@ -617,7 +619,7 @@ function AzureResourceAutomation {
                     Write-Error "Failed to delete the resource group. Ensure the name is correct and you have permissions."
                 }
             }
-            "4" {
+            "0" {
                 Write-Host "Exiting Azure Resource Automation Tool. Goodbye!" -ForegroundColor Yellow
                 break
             }
@@ -1173,6 +1175,168 @@ function printerSetup {
 
 }
 
+#----------------------------------------------------------------------------------------------------------------------------------------------
+function Manage-Languages {
+    param (
+        [string]$action
+    )
+
+    # Define the language map inside the function
+    $languageMap = @{
+        1 = @{ Name = "Deutsch (Schweiz)"; Code = "de-CH" }
+        2 = @{ Name = "Deutsch (Deutschland)"; Code = "de-DE" }
+        3 = @{ Name = "Französisch (Schweiz)"; Code = "fr-CH" }
+        4 = @{ Name = "Englisch"; Code = "en-US" }
+        5 = @{ Name = "Spanisch"; Code = "es-ES" }
+        6 = @{ Name = "Italienisch"; Code = "it-IT" }
+        7 = @{ Name = "Russisch"; Code = "ru-RU" }
+        8 = @{ Name = "Chinesisch"; Code = "zh-CN" }
+        9 = @{ Name = "Japanisch"; Code = "ja-JP" }
+        10 = @{ Name = "Arabisch"; Code = "ar-SA" }
+    }
+
+    function Show-LanguageList {
+        Write-Host "`n🌍 Verfügbare Sprachen:"
+        foreach ($key in $languageMap.Keys) {
+            Write-Host "$key $($languageMap[$key].Name)"
+        }
+    }
+
+    function Get-InstalledLanguages {
+        $installedLanguages = Get-WinUserLanguageList
+        if ($installedLanguages.Count -eq 0) {
+            Write-Host "⚠️ Keine installierten Sprachen gefunden." -ForegroundColor Yellow
+            return @()
+        }
+
+        Write-Host "`n✅ Derzeit installierte Sprachen:"
+        for ($i = 0; $i -lt $installedLanguages.Count; $i++) {
+            Write-Host "$($i+1): $($installedLanguages[$i].LanguageTag)"
+        }
+        return $installedLanguages
+    }
+
+    function Set-DefaultLanguage {
+        $currentLanguages = Get-InstalledLanguages
+        if ($currentLanguages.Count -eq 0) { return }
+
+        $defaultChoice = Read-Host "`n🔹 Geben Sie die Nummer der Sprache ein, die Sie als Standard festlegen möchten"
+
+        if ($defaultChoice -match "^\d+$" -and [int]$defaultChoice -ge 1 -and [int]$defaultChoice -le $currentLanguages.Count) {
+            $defaultLanguage = $currentLanguages[[int]$defaultChoice - 1].LanguageTag
+            Set-WinUILanguageOverride -Language $defaultLanguage
+            Set-WinDefaultInputMethodOverride -InputTip $defaultLanguage
+            Write-Host "✅ Die Standardsprache wurde auf '$defaultLanguage' gesetzt." -ForegroundColor Green
+        } else {
+            Write-Host "⚠️ Fehler: Ungültige Eingabe. Standard bleibt unverändert." -ForegroundColor Yellow
+        }
+    }
+
+    try {
+        switch ($action) {
+            "list" {
+                Get-InstalledLanguages
+            }
+
+            "add" {
+                Show-LanguageList
+                $languageChoice = Read-Host "`nGeben Sie die Nummer der hinzuzufügenden Sprache ein"
+
+                if ($languageChoice -notmatch "^\d+$" -or -not $languageMap.ContainsKey([int]$languageChoice)) {
+                    Write-Host "❌ Fehler: Ungültige Auswahl." -ForegroundColor Red
+                    return
+                }
+
+                $selectedLanguage = $languageMap[[int]$languageChoice]
+                $languageCode = $selectedLanguage.Code
+
+                $currentLanguages = Get-WinUserLanguageList
+                if ($currentLanguages.LanguageTag -contains $languageCode) {
+                    Write-Host "⚠️ Sprache '$($selectedLanguage.Name)' ist bereits installiert." -ForegroundColor Yellow
+                    return
+                }
+
+                $newLanguage = New-WinUserLanguageList $languageCode
+                $newLanguages = $currentLanguages + $newLanguage
+                Set-WinUserLanguageList $newLanguages -Force
+
+                Write-Host "✅ Sprache '$($selectedLanguage.Name)' ($languageCode) wurde erfolgreich hinzugefügt." -ForegroundColor Green
+
+                Set-DefaultLanguage
+            }
+
+            "remove" {
+                $currentLanguages = Get-InstalledLanguages
+                if ($currentLanguages.Count -le 1) {
+                    Write-Host "❌ Fehler: Die einzige installierte Sprache kann nicht entfernt werden." -ForegroundColor Red
+                    return
+                }
+
+                $removeChoice = Read-Host "`n🔹 Geben Sie die Nummer der zu entfernenden Sprache ein"
+
+                if ($removeChoice -notmatch "^\d+$" -or [int]$removeChoice -lt 1 -or [int]$removeChoice -gt $currentLanguages.Count) {
+                    Write-Host "❌ Fehler: Ungültige Auswahl." -ForegroundColor Red
+                    return
+                }
+
+                $languageCode = $currentLanguages[[int]$removeChoice - 1].LanguageTag
+                $newLanguages = $currentLanguages | Where-Object { $_.LanguageTag -ne $languageCode }
+
+                Set-WinUserLanguageList $newLanguages -Force
+                Write-Host "✅ Sprache '$languageCode' wurde erfolgreich entfernt." -ForegroundColor Green
+
+                Set-DefaultLanguage
+            }
+
+            "menu" {
+                do {
+                    Write-Host "`n📌 Was möchten Sie tun?"
+                    Write-Host "1: Aktuelle Sprachen anzeigen"
+                    Write-Host "2: Eine Sprache hinzufügen"
+                    Write-Host "3: Eine Sprache entfernen"
+                    Write-Host "0: Beenden"
+
+                    $choice = Read-Host "🔹 Geben Sie Ihre Wahl ein (1/2/3/0)"
+
+                    if ($choice -notmatch "^\d+$" -or [int]$choice -lt 1 -or [int]$choice -gt 0) {
+                        Write-Host "❌ Fehler: Ungültige Auswahl. Bitte geben Sie eine Zahl zwischen 1 und 3 oder 0 ein." -ForegroundColor Red
+                        
+                    }
+
+                    switch ($choice) {
+                        1 { Manage-Languages -action "list" }
+                        2 { Manage-Languages -action "add" }
+                        3 { Manage-Languages -action "remove" }
+                        0 {
+                            Write-Host "👋 Skript wird beendet." -ForegroundColor Cyan
+                           return 
+                        }
+                    }
+                } while ($choice -ne "0")
+            }
+
+           
+        }
+           
+    }
+    catch {
+        Write-Host "❌ Ein unerwarteter Fehler ist aufgetreten: $_" -ForegroundColor Red
+    }
+     # Start the script by showing the main menu
+Manage-Languages -action "menu"
+
+}
+
+
+
+
+
+
+
+
+
+
+
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1203,6 +1367,7 @@ do {
         "13" {ManageSoftware}
         "14" {taskbarCleaner}
         "15" {printerSetup}
+        "16" {Manage-Languages}
         "0" { Exit-Script }
         default { Write-Host "Invalid selection, please try again." -ForegroundColor Red }
     }
