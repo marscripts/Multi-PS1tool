@@ -21,7 +21,7 @@ The Multi-Tool PowerShell Script is a powerful and user-friendly utility crafted
 - **Install New Software**: Install popular software using Chocolatey.
 - **Taskbar Cleaner**: Optimize your Windows taskbar for efficiency.
 - **PrinterSetup**: Set your Printer easly up.
-- ** Manage systems Languages**: add, rmove, list and set default language just by entering some number.
+- **Manage systems Languages**: add, rmove, list and set default language just by entering some number.
 
 ---
 
